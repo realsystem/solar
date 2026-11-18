@@ -22,9 +22,29 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Assemble site
+        env:
+          SUPPORT_URL: ${{ secrets.SUPPORT_URL || vars.SUPPORT_URL }}
         run: |
           mkdir -p _site
           cp index.html .nojekyll _site/
+          # Put the Support link into the page. Only a plain https URL is used;
+          # otherwise the page keeps its disabled "Support this tool" placeholder.
+          python3 - <<'PY'
+          import html, os, re, urllib.parse
+          raw = (os.environ.get("SUPPORT_URL") or "").strip()
+          if raw and "://" not in raw and re.match(r"^[a-z0-9-]+(\.[a-z0-9-]+)+(/|$)", raw, re.I):
+              raw = "https://" + raw
+          u = urllib.parse.urlparse(raw) if raw else None
+          ok = bool(u and u.scheme == "https" and "." in (u.hostname or "") and not re.search(r"[\s\"'<>`]", raw))
+          path = "_site/index.html"
+          page = open(path, encoding="utf-8").read()
+          tag = '<meta name="support-url" content="">'
+          assert tag in page, "support-url meta tag missing"
+          if ok:
+              page = page.replace(tag, f'<meta name="support-url" content="{html.escape(raw, quote=True)}">')
+          open(path, "w", encoding="utf-8").write(page)
+          print("Support link:", "set" if ok else "not set (placeholder shown)")
+          PY
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

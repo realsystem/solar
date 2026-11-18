@@ -9,6 +9,10 @@ General notes and a simple static calculator for sizing small off-grid solar sys
 
 Open `index.html` in a browser. It's live at **https://overlandn.com/solar/**, deployed by `.github/workflows/deploy.yml` to GitHub Pages on every push to `main`. The repo's Pages source must be set to "GitHub Actions". It's linked as **SolarCalc** in the header of the main site ([realsystem.github.io](https://github.com/realsystem/realsystem.github.io)).
 
+## Support button
+
+The page ends with a **Support this tool** button, the same as the Fuel tool. Its link comes from the `SUPPORT_URL` repository secret or variable (Settings → Secrets and variables → Actions) and is added to the page at deploy time, so the URL is never in the source. Only a plain `https://` link is accepted; a bare `buymeacoffee.com/name` gets `https://` added. If it's unset or invalid, the button shows as disabled ("Coming soon").
+
 ## Privacy
 
 This repository is public. It holds only general information: no personal gear lists, locations or measurements. Settings you enter in the calculator are saved only in your own browser.

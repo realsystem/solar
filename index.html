@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Off-Grid Solar Calculator | RV, Truck Camper & Overland Power Sizing</title>
 <link rel="canonical" href="https://overlandn.com/solar/">
+<!-- Filled at deploy time from the SUPPORT_URL repository secret/variable; empty here on purpose. -->
+<meta name="support-url" content="">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -62,6 +64,13 @@
   .note { color: var(--muted); font-size: .85rem; margin-top: 8px; }
   footer { color: var(--muted); font-size: .85rem; margin-top: 24px; }
   a { color: var(--accent); }
+  .support { text-align: center; color: var(--muted); padding: 24px 0 0; border-top: 1px solid var(--line); margin-top: 24px; }
+  .support p { margin: 0 0 8px; }
+  .btn-support { display: inline-block; font: inherit; font-weight: 600; text-decoration: none; border-radius: 8px;
+                 padding: 8px 14px; background: var(--accent); color: #0f1419; border: 1px solid var(--accent); cursor: pointer; }
+  .btn-support:hover { filter: brightness(1.08); color: #0f1419; }
+  .btn-support:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+  .btn-support:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   @media (max-width: 640px) {
     .header-top { position: static; text-align: left; margin-bottom: 8px; }
     .back-to-main { font-size: .7rem; padding: .3rem .5rem; }
@@ -161,6 +170,11 @@
     Estimates only, not engineering advice. Measure real loads, follow the manuals for your equipment, and use proper fusing.
     Formulas: array W = Wh/day ÷ (PSH × derate); battery Ah = Wh/day × days ÷ (usable fraction × 0.95) ÷ battery V.
   </footer>
+
+  <section class="support" id="support">
+    <p>If this tool was useful, consider supporting it.</p>
+    <button type="button" class="btn-support" id="supportBtn" disabled title="Coming soon">Support this tool</button>
+  </section>
 </main>
 
 <script>
@@ -332,6 +346,26 @@
     try { const s = JSON.parse(txt); if (!Array.isArray(s.loads)) throw 0; state = Object.assign(structuredClone(EXAMPLE), s); writeInputs(); renderLoads(); calc(); }
     catch (e) { alert("That doesn't look like settings from this page."); }
   };
+
+  // Support button: only a plain https link is allowed (never javascript:, data:, http:).
+  // A bare address such as "buymeacoffee.com/name" gets https:// added.
+  function safeSupportUrl(raw) {
+    let v = (raw || "").trim();
+    if (!v) return null;
+    if (!v.includes("://") && /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(v)) v = `https://${v}`;
+    try {
+      const u = new URL(v);
+      return u.protocol === "https:" && u.hostname.includes(".") ? u.toString() : null;
+    } catch (e) { return null; }
+  }
+  const meta = document.querySelector('meta[name="support-url"]');
+  const supportUrl = safeSupportUrl(meta && meta.content);
+  if (supportUrl) {
+    const a = document.createElement("a");
+    a.className = "btn-support"; a.href = supportUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.textContent = "Support this tool";
+    $("supportBtn").replaceWith(a);
+  }
 
   writeInputs(); renderLoads(); calc();
 })();
