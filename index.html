@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Off-grid solar calculator</title>
+<meta name="description" content="Simple off-grid solar sizing calculator: daily load, battery autonomy, array size, string voltage and charge controller checks.">
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --ink: #1f2328; --muted: #6a737d; --line: #d9dcdf;
+    --accent: #c2410c; --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --soft: #f1f2f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111315; --card: #1a1d20; --ink: #e6e8ea; --muted: #9aa4ad; --line: #30363d;
+            --accent: #f0883e; --ok: #3fb950; --warn: #d29922; --bad: #f85149; --soft: #22272e; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; color: var(--accent); }
+  p.lead { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  label { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 6px 0; }
+  label span { color: var(--muted); }
+  input, select { font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line);
+                  border-radius: 6px; padding: 5px 8px; }
+  input[type=number] { width: 7.5em; text-align: right; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 6px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { font-size: .8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  tfoot th { text-transform: none; font-size: .95rem; color: var(--ink); letter-spacing: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td input[type=text] { width: 100%; }
+  td input[type=number] { width: 5.5em; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--soft); color: var(--ink);
+           border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.x { padding: 2px 8px; color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .kpi { background: var(--soft); border-radius: 8px; padding: 10px 12px; }
+  .kpi b { display: block; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+  .kpi small { color: var(--muted); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  .note { color: var(--muted); font-size: .85rem; margin-top: 8px; }
+  footer { color: var(--muted); font-size: .85rem; margin-top: 24px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Off-grid solar calculator</h1>
+  <p class="lead">Size a small off-grid system (RV, van or cabin) for the worst month you'll use it. Everything runs in your browser, and your inputs are saved only in this browser.
+    See the <a href="docs/sizing-guide.md">sizing guide</a> for the method.</p>
+
+  <section class="card">
+    <h2>1. Daily loads</h2>
+    <table id="loads">
+      <thead><tr>
+        <th>Device</th><th class="num">Watts</th><th class="num">Hours/day</th><th class="num">Qty</th>
+        <th>Power</th><th class="num">Wh/day</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><th colspan="5">Total at battery (incl. inverter losses and idle)</th><th class="num" id="loadTotal">0</th><th></th></tr></tfoot>
+    </table>
+    <div class="row">
+      <select id="preset" aria-label="Add a common device"></select>
+      <button id="addPreset">Add device</button>
+      <button id="addBlank">Add blank row</button>
+    </div>
+    <p class="note">Power: <b>DC</b> runs straight off the battery. <b>AC</b> goes through the inverter, which adds about 10% loss.
+      Always-on devices use 24 hours. For cycling loads like fridges, use the 24-hour total from your battery monitor.</p>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>2. System and battery</h2>
+      <label>Battery voltage
+        <select id="sysV"><option value="12">12 V</option><option value="24">24 V</option><option value="48">48 V</option></select></label>
+      <label><span>Battery capacity (Ah)</span><input type="number" id="battAh" min="0" step="10"></label>
+      <label><span>Usable fraction</span><input type="number" id="usable" min="0.1" max="1" step="0.05"></label>
+      <label><span>Target days without sun</span><input type="number" id="targetDays" min="0.5" step="0.5"></label>
+      <label><span>Inverter idle draw (W)</span><input type="number" id="invIdle" min="0" step="1"></label>
+      <label><span>Inverter on (hours/day)</span><input type="number" id="invHours" min="0" max="24" step="1"></label>
+      <label><span>Inverter efficiency</span><input type="number" id="invEff" min="0.5" max="1" step="0.01"></label>
+    </section>
+
+    <section class="card">
+      <h2>3. Solar</h2>
+      <label><span>Panels installed (W total)</span><input type="number" id="arrayW" min="0" step="50"></label>
+      <label><span>Worst-month peak sun hours</span><input type="number" id="pshWorst" min="0.3" step="0.1"></label>
+      <label><span>Best-month peak sun hours</span><input type="number" id="pshBest" min="0.3" step="0.1"></label>
+      <label><span>System derate (losses)</span><input type="number" id="derate" min="0.4" max="1" step="0.01"></label>
+      <p class="note">Get monthly peak sun hours for your site from
+        <a href="https://re.jrc.ec.europa.eu/pvg_tools/en/" rel="noopener">PVGIS</a> or
+        <a href="https://pvwatts.nrel.gov/" rel="noopener">PVWatts</a>.</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Results</h2>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>4. String voltage check (cold)</h2>
+      <label><span>Panel Voc at STC (V)</span><input type="number" id="voc" min="0" step="0.1"></label>
+      <label><span>Panels in series</span><input type="number" id="nSeries" min="1" step="1"></label>
+      <label><span>Coldest expected temperature (°C)</span><input type="number" id="tMin" step="1"></label>
+      <label><span>Voc temperature coefficient (%/°C)</span><input type="number" id="coef" step="0.01"></label>
+      <label><span>Controller max PV voltage (V)</span><input type="number" id="ctrlMaxV" min="0" step="5"></label>
+      <div id="stringOut" class="kpis" style="margin-top:10px"></div>
+      <p class="note">Panel open-circuit voltage (Voc) rises as it gets colder. Use the coefficient from your panel's datasheet; −0.28%/°C is typical. Keep at least 5% margin below the controller's maximum.</p>
+    </section>
+
+    <section class="card">
+      <h2>5. Charge controller capacity</h2>
+      <label><span>Controller rating (A)</span><input type="number" id="ctrlA" min="0" step="5"></label>
+      <label><span>Number of controllers</span><input type="number" id="ctrlN" min="1" step="1"></label>
+      <div id="ctrlOut" class="kpis" style="margin-top:10px"></div>
+      <p class="note">Usable panel watts ≈ amps × ~14.3 V per 12 V of battery. For example, a 70 A controller handles about 1,000 W at 12 V. More panel watts than that is fine; the controller just clips them at midday.</p>
+    </section>
+  </div>
+
+  <div class="row">
+    <button id="reset">Reset to example</button>
+    <button id="export">Copy settings (JSON)</button>
+    <button id="import">Paste settings</button>
+  </div>
+
+  <footer>
+    Estimates only, not engineering advice. Measure real loads, follow the manuals for your equipment, and use proper fusing.
+    Formulas: array W = Wh/day ÷ (PSH × derate); battery Ah = Wh/day × days ÷ (usable fraction × 0.95) ÷ battery V.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const PRESETS = [
+    ["12 V compressor fridge (24 h avg)", 20, 24, "DC"],
+    ["Residential fridge (24 h avg)", 50, 24, "AC"],
+    ["Propane fridge control board", 3, 24, "DC"],
+    ["Furnace blower", 40, 4, "DC"],
+    ["Roof fan", 15, 6, "DC"],
+    ["LED lights", 15, 4, "DC"],
+    ["Water pump", 60, 0.3, "DC"],
+    ["Phones / tablets", 15, 3, "DC"],
+    ["Laptop", 45, 4, "DC"],
+    ["TV", 50, 2, "AC"],
+    ["Toaster", 900, 0.1, "AC"],
+    ["Coffee maker", 900, 0.15, "AC"],
+    ["Microwave", 1200, 0.15, "AC"],
+    ["Rooftop AC (with soft starter)", 1300, 2, "AC"],
+    ["Starlink Mini", 30, 24, "DC"],
+    ["Wi-Fi router", 10, 24, "DC"],
+    ["PoE camera", 4, 24, "DC"],
+    ["PoE switch overhead", 5, 24, "DC"],
+    ["Raspberry Pi 5", 5, 24, "DC"],
+    ["N100 mini PC (NVR / server)", 10, 24, "DC"],
+    ["CPAP", 40, 8, "DC"]
+  ];
+
+  const EXAMPLE = {
+    loads: [
+      ["12 V compressor fridge (24 h avg)", 20, 24, 1, "DC"],
+      ["Furnace blower", 40, 4, 1, "DC"],
+      ["Roof fan", 15, 6, 1, "DC"],
+      ["LED lights", 15, 4, 1, "DC"],
+      ["Water pump", 60, 0.3, 1, "DC"],
+      ["Phones / tablets", 15, 3, 1, "DC"],
+      ["Laptop", 45, 4, 1, "DC"]
+    ],
+    sysV: 12, battAh: 300, usable: 0.8, targetDays: 2, invIdle: 6, invHours: 2, invEff: 0.9,
+    arrayW: 400, pshWorst: 3, pshBest: 6, derate: 0.75,
+    voc: 22.5, nSeries: 2, tMin: -15, coef: -0.28, ctrlMaxV: 100,
+    ctrlA: 40, ctrlN: 1
+  };
+
+  const KEY = "offgrid-solar-calc-v1";
+  const $ = id => document.getElementById(id);
+  const FIELDS = ["sysV","battAh","usable","targetDays","invIdle","invHours","invEff","arrayW","pshWorst",
+                  "pshBest","derate","voc","nSeries","tMin","coef","ctrlMaxV","ctrlA","ctrlN"];
+  const fmt = (n, d = 0) => Number.isFinite(n) ? n.toLocaleString(undefined, {maximumFractionDigits: d, minimumFractionDigits: d}) : "–";
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  function load() {
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.loads)) return s; } catch (e) {}
+    return structuredClone(EXAMPLE);
+  }
+  function save(state) { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  let state = load();
+
+  // presets
+  $("preset").innerHTML = PRESETS.map((p, i) => `<option value="${i}">${esc(p[0])} (${p[1]} W)</option>`).join("");
+
+  function renderLoads() {
+    const tb = $("loads").querySelector("tbody");
+    tb.innerHTML = state.loads.map((r, i) => `
+      <tr data-i="${i}">
+        <td><input type="text" data-k="0" value="${esc(r[0])}" aria-label="Device"></td>
+        <td class="num"><input type="number" data-k="1" value="${r[1]}" min="0" step="1" aria-label="Watts"></td>
+        <td class="num"><input type="number" data-k="2" value="${r[2]}" min="0" max="24" step="0.1" aria-label="Hours per day"></td>
+        <td class="num"><input type="number" data-k="3" value="${r[3]}" min="0" step="1" aria-label="Quantity"></td>
+        <td><select data-k="4" aria-label="DC or AC"><option${r[4]==="DC"?" selected":""}>DC</option><option${r[4]==="AC"?" selected":""}>AC</option></select></td>
+        <td class="num" data-wh></td>
+        <td><button class="x" data-del aria-label="Remove row">×</button></td>
+      </tr>`).join("");
+  }
+
+  function readInputs() {
+    for (const f of FIELDS) {
+      const v = $(f).value;
+      state[f] = f === "sysV" ? Number(v) : parseFloat(v);
+    }
+  }
+  function writeInputs() { for (const f of FIELDS) $(f).value = state[f]; }
+
+  function kpi(label, value, sub, cls = "") {
+    return `<div class="kpi"><small>${label}</small><b class="${cls}">${value}</b><small>${sub || ""}</small></div>`;
+  }
+
+  function calc() {
+    readInputs();
+    const V = state.sysV === 12 ? 12.8 : state.sysV === 24 ? 25.6 : 51.2;
+    let dcWh = 0, acWh = 0;
+    const rows = $("loads").querySelectorAll("tbody tr");
+    state.loads.forEach((r, i) => {
+      const wh = (+r[1] || 0) * (+r[2] || 0) * (+r[3] || 0);
+      if (r[4] === "AC") acWh += wh; else dcWh += wh;
+      const cell = rows[i] && rows[i].querySelector("[data-wh]");
+      if (cell) cell.textContent = fmt(wh);
+    });
+    const invWh = acWh / (state.invEff || 0.9) + (state.invIdle || 0) * (state.invHours || 0);
+    const dayWh = dcWh + invWh;
+    const dayAh = dayWh / V;
+    $("loadTotal").textContent = `${fmt(dayWh)} Wh (${fmt(dayAh)} Ah)`;
+
+    const usableWh = state.battAh * V * state.usable;
+    const days = dayWh > 0 ? usableWh / dayWh : Infinity;
+    const needAh = dayWh * state.targetDays / (state.usable * 0.95) / V;
+    const needWorst = dayWh / (state.pshWorst * state.derate);
+    const needBest = dayWh / (state.pshBest * state.derate);
+    const prodWorst = state.arrayW * state.pshWorst * state.derate;
+    const prodBest = state.arrayW * state.pshBest * state.derate;
+    const balWorst = prodWorst - dayWh;
+
+    $("kpis").innerHTML =
+      kpi("Daily use", `${fmt(dayWh)} Wh`, `${fmt(dayAh)} Ah at ${state.sysV} V · AC share ${fmt(invWh)} Wh`) +
+      kpi("Days without sun", fmt(days, 1), `from ${fmt(state.battAh)} Ah × ${fmt(state.usable * 100)}% usable`,
+          days >= state.targetDays ? "ok" : days >= state.targetDays / 2 ? "warn" : "bad") +
+      kpi("Battery for target", `${fmt(needAh)} Ah`, `${fmt(state.targetDays, 1)} days at ${state.sysV} V`) +
+      kpi("Panels needed, worst month", `${fmt(needWorst)} W`, `best month: ${fmt(needBest)} W`,
+          state.arrayW >= needWorst ? "ok" : state.arrayW >= needBest ? "warn" : "bad") +
+      kpi("Solar harvest, worst month", `${fmt(prodWorst)} Wh/day`,
+          `${balWorst >= 0 ? "surplus" : "deficit"} ${fmt(Math.abs(balWorst))} Wh/day`, balWorst >= 0 ? "ok" : "bad") +
+      kpi("Solar harvest, best month", `${fmt(prodBest)} Wh/day`, `from ${fmt(state.arrayW)} W of panels`);
+
+    // string check
+    const vocString = state.voc * state.nSeries;
+    const vocCold = vocString * (1 + (state.coef / 100) * (state.tMin - 25));
+    const margin = state.ctrlMaxV > 0 ? (state.ctrlMaxV - vocCold) / state.ctrlMaxV : NaN;
+    const sCls = vocCold > state.ctrlMaxV ? "bad" : margin < 0.05 ? "warn" : "ok";
+    const sTxt = vocCold > state.ctrlMaxV ? "OVER LIMIT: can damage the controller" : margin < 0.05 ? "Too close to the limit" : "OK";
+    $("stringOut").innerHTML =
+      kpi("String Voc at 25 °C", `${fmt(vocString, 1)} V`) +
+      kpi(`String Voc at ${fmt(state.tMin)} °C`, `${fmt(vocCold, 1)} V`, margin >= 0 ? `${fmt(margin * 100)}% below the controller max` : `${fmt(-margin * 100, 1)}% over the controller max`, sCls) +
+      kpi("Status", sTxt, "", sCls);
+
+    // controller
+    const usableW = state.ctrlA * state.ctrlN * 14.3 * (state.sysV / 12);
+    const clip = state.arrayW > usableW;
+    $("ctrlOut").innerHTML =
+      kpi("Panel watts the controllers can use", `${fmt(usableW)} W`, `${state.ctrlN} × ${fmt(state.ctrlA)} A at ${state.sysV} V`) +
+      kpi("Your panels", `${fmt(state.arrayW)} W`, clip ? "will clip at midday (OK)" : "within capacity", clip ? "warn" : "ok");
+
+    save(state);
+  }
+
+  // events
+  $("loads").addEventListener("input", e => {
+    const tr = e.target.closest("tr[data-i]"); if (!tr) return;
+    const i = +tr.dataset.i, k = +e.target.dataset.k;
+    state.loads[i][k] = k === 0 || k === 4 ? e.target.value : parseFloat(e.target.value) || 0;
+    calc();
+  });
+  $("loads").addEventListener("click", e => {
+    if (!e.target.matches("[data-del]")) return;
+    state.loads.splice(+e.target.closest("tr").dataset.i, 1); renderLoads(); calc();
+  });
+  $("addPreset").onclick = () => { const p = PRESETS[+$("preset").value]; state.loads.push([p[0], p[1], p[2], 1, p[3]]); renderLoads(); calc(); };
+  $("addBlank").onclick = () => { state.loads.push(["New device", 0, 0, 1, "DC"]); renderLoads(); calc(); };
+  FIELDS.forEach(f => $(f).addEventListener("input", calc));
+  $("reset").onclick = () => { state = structuredClone(EXAMPLE); writeInputs(); renderLoads(); calc(); };
+  $("export").onclick = async () => {
+    const txt = JSON.stringify(state);
+    try { await navigator.clipboard.writeText(txt); $("export").textContent = "Copied"; }
+    catch (e) { window.prompt("Copy these settings:", txt); }
+    setTimeout(() => $("export").textContent = "Copy settings (JSON)", 1500);
+  };
+  $("import").onclick = () => {
+    const txt = window.prompt("Paste settings JSON:"); if (!txt) return;
+    try { const s = JSON.parse(txt); if (!Array.isArray(s.loads)) throw 0; state = Object.assign(structuredClone(EXAMPLE), s); writeInputs(); renderLoads(); calc(); }
+    catch (e) { alert("That doesn't look like settings from this page."); }
+  };
+
+  writeInputs(); renderLoads(); calc();
+})();
+</script>
+</body>
+</html>
