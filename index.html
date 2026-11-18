@@ -3,58 +3,83 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Off-grid solar calculator</title>
+<title>Off-Grid Solar Calculator | RV, Truck Camper & Overland Power Sizing</title>
+<link rel="canonical" href="https://overlandn.com/solar/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <meta name="description" content="Simple off-grid solar sizing calculator: daily load, battery autonomy, array size, string voltage and charge controller checks.">
 <style>
   :root {
-    --bg: #f7f7f5; --card: #ffffff; --ink: #1f2328; --muted: #6a737d; --line: #d9dcdf;
-    --accent: #c2410c; --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --soft: #f1f2f3;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #111315; --card: #1a1d20; --ink: #e6e8ea; --muted: #9aa4ad; --line: #30363d;
-            --accent: #f0883e; --ok: #3fb950; --warn: #d29922; --bad: #f85149; --soft: #22272e; }
+    --bg: #0f1419; --bg2: #1a1f28; --bg3: #242933; --card: #1e242e; --soft: #242933;
+    --ink: #e6edf3; --ink2: #adbac7; --muted: #768390; --line: #343942; --line2: #444c56;
+    --accent: #4eb56a; --accent-hover: #5ec67a; --accent-muted: rgba(78, 181, 106, 0.1);
+    --ok: #56d364; --warn: #e3b341; --bad: #ff6b6b;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+         font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .app-header { background: linear-gradient(135deg, var(--bg2) 0%, var(--bg3) 100%);
+                border-bottom: 2px solid var(--accent); padding: 16px 0; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+  .header-content { max-width: 1200px; margin: 0 auto; padding: 0 24px; text-align: center; position: relative; }
+  .header-top { position: absolute; left: 24px; top: 0; }
+  .back-to-main { display: inline-flex; align-items: center; gap: .25rem; padding: .35rem .6rem; font-size: .75rem;
+                  font-weight: 500; color: var(--muted); border: 1px solid rgba(78, 181, 106, .25); border-radius: 3px;
+                  text-decoration: none; transition: all .2s ease; }
+  .back-to-main:hover { color: var(--accent); background: var(--accent-muted); border-color: var(--accent); transform: translateX(-2px); }
+  .app-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 .25rem;
+                   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+                   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .tagline { color: var(--ink2); margin: 0; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
   h2 { font-size: 1.05rem; margin: 0 0 12px; color: var(--accent); }
-  p.lead { color: var(--muted); margin: 0 0 20px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  p.lead { color: var(--ink2); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
   label { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 6px 0; }
-  label span { color: var(--muted); }
-  input, select { font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line);
-                  border-radius: 6px; padding: 5px 8px; }
-  input[type=number] { width: 7.5em; text-align: right; }
+  label span { color: var(--ink2); }
+  input, select { font: inherit; color: var(--ink); background: var(--bg2); border: 1px solid var(--line);
+                  border-radius: 4px; padding: 5px 8px; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input[type=number] { width: 7.5em; text-align: right; font-family: "JetBrains Mono", ui-monospace, monospace; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 6px 6px; border-bottom: 1px solid var(--line); text-align: left; }
-  th { font-size: .8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  th, td { padding: 6px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
   tfoot th { text-transform: none; font-size: .95rem; color: var(--ink); letter-spacing: 0; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   td input[type=text] { width: 100%; }
   td input[type=number] { width: 5.5em; }
-  button { font: inherit; border: 1px solid var(--line); background: var(--soft); color: var(--ink);
-           border-radius: 6px; padding: 5px 10px; cursor: pointer; }
-  button:hover { border-color: var(--accent); }
+  button { font: inherit; border: 1px solid var(--line); background: var(--bg3); color: var(--ink);
+           border-radius: 4px; padding: 5px 10px; cursor: pointer; transition: all .2s ease; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
   button.x { padding: 2px 8px; color: var(--muted); }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
   .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-  .kpi { background: var(--soft); border-radius: 8px; padding: 10px 12px; }
+  .kpi { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
   .kpi b { display: block; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
   .kpi small { color: var(--muted); }
   .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
   .note { color: var(--muted); font-size: .85rem; margin-top: 8px; }
   footer { color: var(--muted); font-size: .85rem; margin-top: 24px; }
   a { color: var(--accent); }
+  @media (max-width: 640px) {
+    .header-top { position: static; text-align: left; margin-bottom: 8px; }
+    .back-to-main { font-size: .7rem; padding: .3rem .5rem; }
+    .app-header h1 { font-size: 1.25rem; }
+  }
 </style>
 </head>
 <body>
+<header class="app-header">
+  <div class="header-content">
+    <div class="header-top"><a href="https://overlandn.com" class="back-to-main">← Back to main page</a></div>
+    <h1>Off-Grid Solar Calculator</h1>
+    <p class="tagline">Battery, panel and charge controller sizing for RVs, truck campers and overland rigs</p>
+  </div>
+</header>
 <main>
-  <h1>Off-grid solar calculator</h1>
   <p class="lead">Size a small off-grid system (RV, van or cabin) for the worst month you'll use it. Everything runs in your browser, and your inputs are saved only in this browser.
-    See the <a href="docs/sizing-guide.md">sizing guide</a> for the method.</p>
+    See the <a href="https://github.com/realsystem/solar/blob/main/docs/sizing-guide.md" rel="noopener">sizing guide</a> for the method.</p>
 
   <section class="card">
     <h2>1. Daily loads</h2>
